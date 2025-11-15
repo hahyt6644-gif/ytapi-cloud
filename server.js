@@ -1,39 +1,59 @@
-const express = require('express');
-const ytdl = require('ytdl-core');
+import express from 'express';
+import ytdl from 'ytdl-core';
+import puppeteer from 'puppeteer';
 
 const app = express();
 
-async function getLatestVideoUrlByUsername(username) {
-  // Get the channel URL from username
-  const channelUrl = `https://www.youtube.com/user/${username}`;
-  
-  // Fetch the channel's videos page
-  const info = await ytdl.getInfo(channelUrl).catch(() => null);
-  if (!info || !info.videoDetails) throw new Error('Unable to fetch channel videos');
+async function getLatestVideoId(username) {
+  const channelUrl = `https://www.youtube.com/user/${username}/videos`;
 
-  const videoId = info.videoDetails.media.video_id; // Likely incorrect, need to fetch latest video differently
+  const browser = await puppeteer.launch({
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  const page = await browser.newPage();
 
-  // The above might not give latest video, so alternatively, need to scrape or use another method
+  await page.goto(channelUrl, { waitUntil: 'networkidle2' });
+
+  // Wait for video links to load
+  await page.waitForSelector('a#video-title');
+
+  // Extract first video ID on the page
+  const videoId = await page.evaluate(() => {
+    const videoLink = document.querySelector('a#video-title');
+    if (!videoLink) return null;
+    const url = new URL(videoLink.href);
+    return url.searchParams.get('v');
+  });
+
+  await browser.close();
+
+  if (!videoId) throw new Error('Could not find latest video ID for username: ' + username);
+  return videoId;
 }
-
-// Here's a practical approach: We can search for latest videos by the username channel URL
-// But ytdl-core alone does not support fetching latest videos from username directly.
-// Instead, we can use a headless browser or a scraping method, but for simplicity, we assume we already have the latest video ID chance
 
 app.get('/latest-video', async (req, res) => {
   const username = req.query.username;
-  if (!username) return res.status(400).send('Username required');
+  if (!username) return res.status(400).json({ error: 'username query parameter is required' });
 
   try {
-    // This part needs actual implementation of fetching latest video ID from username
-    const latestVideoUrl = `https://www.youtube.com/watch?v=LATEST_VIDEO_ID`;
-    const info = await ytdl.getInfo(latestVideoUrl);
+    const videoId = await getLatestVideoId(username);
+    const videoUrl = 'https://www.youtube.com/watch?v=' + videoId;
+
+    const info = await ytdl.getInfo(videoUrl);
+
     const format = ytdl.chooseFormat(info.formats, { quality: 'highestvideo' });
-    res.json({ downloadUrl: format.url });
+
+    if (!format || !format.url) {
+      return res.status(404).json({ error: 'No downloadable format found' });
+    }
+
+    res.json({ videoId, downloadUrl: format.url });
   } catch (err) {
-    res.status(500).send('Error fetching video: ' + err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
