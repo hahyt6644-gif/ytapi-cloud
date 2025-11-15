@@ -2,15 +2,14 @@ import { Innertube } from "youtubei.js";
 
 export default async function formats(req, res) {
   try {
-    const { id } = req.query;
-
+    const id = req.query.id;
     if (!id)
       return res.status(400).json({ error: "Missing id" });
 
     const yt = await Innertube.create({
       client_type: "WEB_REMIX",
       enable_safety_mode: false,
-      fetch: (input, init) => fetch(input, init)
+      fetch: (...args) => fetch(...args)
     });
 
     const info = await yt.getInfo(id);
@@ -18,7 +17,7 @@ export default async function formats(req, res) {
 
     res.json({
       success: true,
-      id,
+      video_id: id,
       formats: list.map(f => ({
         quality: f.quality_label || null,
         url: f.url || null,
