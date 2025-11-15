@@ -2,35 +2,34 @@ import { Innertube } from "youtubei.js";
 
 export default async function download(req, res) {
   try {
-    const { id, quality } = req.query;
+    const id = req.query.id;
+    const quality = req.query.quality ? parseInt(req.query.quality) : null;
 
     if (!id)
       return res.status(400).json({ error: "Missing id" });
 
-    const q = quality ? parseInt(quality) : null;
-
     const yt = await Innertube.create({
       client_type: "WEB_REMIX",
       enable_safety_mode: false,
-      fetch: (input, init) => fetch(input, init)
+      fetch: (...args) => fetch(...args)
     });
 
     const info = await yt.getInfo(id);
     const list = [...info.streaming_data.formats, ...info.streaming_data.adaptive_formats];
 
-    const selected = list
+    const match = list
       .filter(f => f.height)
       .sort((a, b) => b.height - a.height)
-      .find(f => !q || f.height <= q);
+      .find(f => !quality || f.height <= quality);
 
-    if (!selected)
-      return res.status(404).json({ error: "No format available" });
+    if (!match)
+      return res.status(404).json({ error: "No matching format" });
 
     res.json({
       success: true,
       id,
-      served: selected.height,
-      url: selected.url
+      served_quality: match.height,
+      url: match.url
     });
 
   } catch (err) {
