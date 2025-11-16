@@ -1,18 +1,13 @@
 {
-  "name": "youtube-latest-video-downloader",
+  "name": "ytapi-cloud",
   "version": "1.0.0",
-  "description": "API to get latest YouTube video download link by username",
-  "main": "server.js",
   "type": "module",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.21.0",
+    "youtubei.js": "8.1.0"
+  },
   "scripts": {
     "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=16.x"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "puppeteer": "^21.3.8",
-    "ytdl-core": "^4.11.2"
   }
 }
