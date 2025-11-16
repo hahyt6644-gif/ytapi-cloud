@@ -1,12 +1,9 @@
 {
-  "name": "ytapi-cloud",
-  "version": "1.0.0",
-  "main": "server.js",
+  "name": "yt-shorts-api",
   "type": "module",
   "dependencies": {
     "express": "^4.18.2",
-    "rss-parser": "^3.12.0",
-    "node-fetch": "^3.3.2"
+    "youtubei.js": "^6.3.0"
   },
   "scripts": {
     "start": "node server.js"
