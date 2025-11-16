@@ -5,36 +5,36 @@ import fetch from "node-fetch";
 const app = express();
 const parser = new Parser();
 
-// GET YOUTUBE CHANNEL ID FROM @username
+// Get channelId by visiting: https://www.youtube.com/@USERNAME
 async function getChannelId(username) {
   const url = `https://www.youtube.com/@${username}`;
 
   const html = await fetch(url).then(r => r.text());
 
-  // Extract channelId from HTML
-  const match = html.match(/"channelId":"(.*?)"/);
+  // Extract "channelId":"UCxxxxxxxxxxxxxx"
+  const match = html.match(/"channelId":"(UC[0-9A-Za-z_-]{22})"/);
 
-  if (!match) return null;
-
-  return match[1];
+  return match ? match[1] : null;
 }
 
 app.get("/latest", async (req, res) => {
   try {
-    const username = req.query.username;
-
-    if (!username) {
+    const rawUsername = req.query.username;
+    if (!rawUsername) {
       return res.status(400).json({ error: "Missing ?username=" });
     }
 
-    // Convert @username → ChannelID
+    // Remove @ if supplied
+    const username = rawUsername.replace(/^@/, "");
+
+    // Convert username → channel ID
     const channelId = await getChannelId(username);
 
     if (!channelId) {
       return res.status(404).json({ error: "Channel not found" });
     }
 
-    // Fetch RSS feed
+    // Fetch RSS feed using channel_id (100% reliable)
     const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
     const feed = await parser.parseURL(feedUrl);
 
@@ -52,9 +52,8 @@ app.get("/latest", async (req, res) => {
       video_id: videoId,
       url: `https://www.youtube.com/watch?v=${videoId}`
     });
-
-  } catch (err) {
-    res.json({ error: String(err) });
+  } catch (e) {
+    res.json({ error: e.toString() });
   }
 });
 
