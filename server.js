@@ -1,14 +1,24 @@
 import express from "express";
 import Parser from "rss-parser";
+import fetch from "node-fetch";
 
 const app = express();
 const parser = new Parser();
 
-app.get("/", (req, res) => {
-  res.json({ status: "YouTube Latest API Running" });
-});
+// GET YOUTUBE CHANNEL ID FROM @username
+async function getChannelId(username) {
+  const url = `https://www.youtube.com/@${username}`;
 
-// Endpoint: /latest?username=MrBeast
+  const html = await fetch(url).then(r => r.text());
+
+  // Extract channelId from HTML
+  const match = html.match(/"channelId":"(.*?)"/);
+
+  if (!match) return null;
+
+  return match[1];
+}
+
 app.get("/latest", async (req, res) => {
   try {
     const username = req.query.username;
@@ -17,23 +27,30 @@ app.get("/latest", async (req, res) => {
       return res.status(400).json({ error: "Missing ?username=" });
     }
 
-    // YouTube RSS feed (never breaks)
-    const url = `https://www.youtube.com/feeds/videos.xml?user=${username}`;
+    // Convert @username → ChannelID
+    const channelId = await getChannelId(username);
 
-    const feed = await parser.parseURL(url);
+    if (!channelId) {
+      return res.status(404).json({ error: "Channel not found" });
+    }
 
-    if (!feed.items || feed.items.length === 0) {
-      return res.json({ error: "Channel not found or no videos" });
+    // Fetch RSS feed
+    const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
+    const feed = await parser.parseURL(feedUrl);
+
+    if (!feed.items.length) {
+      return res.json({ error: "No videos found" });
     }
 
     const latest = feed.items[0];
-    const id = latest.id.replace("yt:video:", "");
+    const videoId = latest.id.replace("yt:video:", "");
 
     res.json({
-      channel: username,
+      username,
+      channel_id: channelId,
       title: latest.title,
-      video_id: id,
-      url: `https://www.youtube.com/watch?v=${id}`
+      video_id: videoId,
+      url: `https://www.youtube.com/watch?v=${videoId}`
     });
 
   } catch (err) {
